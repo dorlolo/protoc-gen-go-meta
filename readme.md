@@ -18,7 +18,7 @@ Adds the Values() method to the enum class so that it can output custom string v
 3. copy [./mea.proto](./mea.proto) into your project.
 <p>
 
-4. then, You can refer to [./example/test.proto](./example/test.proto) for development 
+4. then, You can refer to [./example/test.proto](./example/test.proto) for development.
 <p>
 
 5. finally, using protoc to produce the file, just add a '--go-meta_out' parameter to the original command. for example:
