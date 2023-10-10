@@ -15,7 +15,7 @@ go install github.com/dorlolo/protoc-gen-go-meta
 
 5. finally, using protoc to produce the file, just add a '--go-meta_out' parameter to the original command. 
 
-for example:
+    for example:
     ```cmd
     protoc --proto_path=. --go-meta_out=.\example --go_out=.\example .\example\test.proto
     ```
