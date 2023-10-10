@@ -1,0 +1,13 @@
+syntax = "proto3";
+package example;
+option go_package = "./;example";
+
+//protoc --proto_path=. --go-meta_out=.\example --go_out=.\example .\example\test.proto
+import "meta/meta.proto";
+
+
+enum TestDataType {
+  One = 0 [(meta.enum_value) = "1111"];
+  Two = 1 [(meta.enum_value) = "2222"];
+  Three = 2 [(meta.enum_value) = "333",deprecated=true];
+}

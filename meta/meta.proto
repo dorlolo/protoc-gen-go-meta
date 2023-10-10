@@ -1,0 +1,8 @@
+syntax = "proto3";
+package meta;
+option go_package = "github.com/dorlolo/protoc-gen-go-meta/meta;meta";
+
+import "google/protobuf/descriptor.proto";
+extend google.protobuf.EnumValueOptions {
+  optional string enum_value = 51234;
+}
