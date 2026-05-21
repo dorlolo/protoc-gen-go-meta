@@ -12,28 +12,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.20'
-
       - name: Get version
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Build
+      - name: Package source code
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o protoc-gen-go-meta-linux-amd64
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o protoc-gen-go-meta-darwin-amd64
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o protoc-gen-go-meta-darwin-arm64
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.get_version.outputs.VERSION }}" -o protoc-gen-go-meta-windows-amd64.exe
+          tar -czf protoc-gen-go-meta-source-${{ steps.get_version.outputs.VERSION }}.tar.gz --exclude='.git' --exclude='.github' .
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            protoc-gen-go-meta-linux-amd64
-            protoc-gen-go-meta-darwin-amd64
-            protoc-gen-go-meta-darwin-arm64
-            protoc-gen-go-meta-windows-amd64.exe
+          files: protoc-gen-go-meta-source-${{ steps.get_version.outputs.VERSION }}.tar.gz
           generate_release_notes: true
