@@ -10,14 +10,25 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/dorlolo/protoc-gen-go-meta/meta"
+	"github.com/golang/protobuf/proto"
 	gengo "google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo"
 	"google.golang.org/protobuf/compiler/protogen"
 )
 
 var version = "dev"
+
+func init() {
+	// 读取 Go 构建信息（go install 自动注入）
+	if info, ok := debug.ReadBuildInfo(); ok {
+		// 优先使用 go install 带来的版本号（v1.0.0）
+		if info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = info.Main.Version
+		}
+	}
+}
 
 func main() {
 	versionFlag := flag.Bool("version", false, "print the version and exit")
