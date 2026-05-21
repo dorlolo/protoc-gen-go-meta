@@ -7,11 +7,27 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"os"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/dorlolo/protoc-gen-go-meta/meta"
 	gengo "google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo"
 	"google.golang.org/protobuf/compiler/protogen"
 )
 
+var version = "dev"
+
 func main() {
+	versionFlag := flag.Bool("version", false, "print the version and exit")
+	flag.Parse()
+
+	if *versionFlag {
+		fmt.Println(version)
+		os.Exit(0)
+	}
+
 	protogen.Options{}.Run(func(gen *protogen.Plugin) error {
 		for _, f := range gen.Files {
 			if !f.Generate {
@@ -24,10 +40,24 @@ func main() {
 	})
 }
 
+func hasEnumValueOption(file *protogen.File) bool {
+	for _, e := range file.Enums {
+		for _, v := range e.Values {
+			opts := v.Desc.Options()
+			if opts != nil && proto.HasExtension(proto.MessageV1(opts), meta.E_EnumValue) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func GenerateFile(gen *protogen.Plugin, file *protogen.File) *protogen.GeneratedFile {
+	if !hasEnumValueOption(file) {
+		return nil
+	}
 	filename := file.GeneratedFilenamePrefix + ".pb.enumValue.go"
 	g := gen.NewGeneratedFile(filename, file.GoImportPath)
-	//packageDoc := genPackageKnownComment(f)
 	g.P("package ", file.GoPackageName)
 	g.P()
 	g.P("import (")
