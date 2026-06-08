@@ -12,10 +12,10 @@ import (
 	"os"
 	"runtime/debug"
 
-	"github.com/dorlolo/protoc-gen-go-meta/meta"
-	"github.com/golang/protobuf/proto"
 	gengo "google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo"
 	"google.golang.org/protobuf/compiler/protogen"
+	"google.golang.org/protobuf/encoding/protowire"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var version = "dev"
@@ -40,31 +40,73 @@ func main() {
 	}
 
 	protogen.Options{}.Run(func(gen *protogen.Plugin) error {
+		ext := findEnumValueExtension(gen)
+		if ext == nil {
+			return nil
+		}
+		extNumber := ext.Desc.Number()
 		for _, f := range gen.Files {
 			if !f.Generate {
 				continue
 			}
-			GenerateFile(gen, f)
+			GenerateFile(gen, f, extNumber)
 		}
 		gen.SupportedFeatures = gengo.SupportedFeatures
 		return nil
 	})
 }
 
-func hasEnumValueOption(file *protogen.File) bool {
-	for _, e := range file.Enums {
-		for _, v := range e.Values {
-			opts := v.Desc.Options()
-			if opts != nil && proto.HasExtension(proto.MessageV1(opts), meta.E_EnumValue) {
-				return true
+func findEnumValueExtension(gen *protogen.Plugin) *protogen.Extension {
+	for _, f := range gen.Files {
+		for _, ext := range f.Extensions {
+			if ext.Desc.Name() == "enum_value" && ext.Desc.ContainingMessage().FullName() == "google.protobuf.EnumValueOptions" {
+				return ext
 			}
+		}
+	}
+	return nil
+}
+
+func hasExtensionField(b []byte, number protoreflect.FieldNumber) bool {
+	for len(b) > 0 {
+		num, typ, n := protowire.ConsumeTag(b)
+		if n < 0 {
+			return false
+		}
+		b = b[n:]
+		if num == protowire.Number(number) {
+			return true
+		}
+		n = protowire.ConsumeFieldValue(num, typ, b)
+		if n < 0 {
+			return false
+		}
+		b = b[n:]
+	}
+	return false
+}
+
+func enumHasEnumValueOption(enum *protogen.Enum, number protoreflect.FieldNumber) bool {
+	for _, v := range enum.Values {
+		opts := v.Desc.Options()
+		if opts != nil && hasExtensionField(opts.ProtoReflect().GetUnknown(), number) {
+			return true
 		}
 	}
 	return false
 }
 
-func GenerateFile(gen *protogen.Plugin, file *protogen.File) *protogen.GeneratedFile {
-	if !hasEnumValueOption(file) {
+func hasEnumValueOption(file *protogen.File, number protoreflect.FieldNumber) bool {
+	for _, e := range file.Enums {
+		if enumHasEnumValueOption(e, number) {
+			return true
+		}
+	}
+	return false
+}
+
+func GenerateFile(gen *protogen.Plugin, file *protogen.File, enumValueNumber protoreflect.FieldNumber) *protogen.GeneratedFile {
+	if !hasEnumValueOption(file, enumValueNumber) {
 		return nil
 	}
 	filename := file.GeneratedFilenamePrefix + ".pb.enumValue.go"
@@ -72,20 +114,33 @@ func GenerateFile(gen *protogen.Plugin, file *protogen.File) *protogen.Generated
 	g.P("package ", file.GoPackageName)
 	g.P()
 	g.P("import (")
-	g.P("\"github.com/golang/protobuf/proto\"")
-	g.P("\"github.com/dorlolo/protoc-gen-go-meta/meta\"")
+	g.P("\"google.golang.org/protobuf/encoding/protowire\"")
 	g.P("\"strconv\"")
 	g.P(")")
 
 	for _, e := range file.Enums {
+		if !enumHasEnumValueOption(e, enumValueNumber) {
+			continue
+		}
 		g.P("func (x ", e.GoIdent, ") Value() string {")
-		g.P("extOpts, err := proto.GetExtension(proto.MessageV1(x.Descriptor().Values().ByNumber(x.Number()).Options()), meta.E_EnumValue)")
-		g.P("if err != nil {")
-		g.P("return strconv.Itoa(int(x))")
+		g.P("opts := x.Descriptor().Values().ByNumber(x.Number()).Options().ProtoReflect().GetUnknown()")
+		g.P("for len(opts) > 0 {")
+		g.P("num, typ, n := protowire.ConsumeTag(opts)")
+		g.P("if n < 0 {")
+		g.P("break")
 		g.P("}")
-		g.P("enumOptions, ok := extOpts.(*string)")
-		g.P("if ok {")
-		g.P("return *enumOptions")
+		g.P("opts = opts[n:]")
+		g.P("if num == ", protowire.Number(enumValueNumber), " && typ == protowire.BytesType {")
+		g.P("value, n := protowire.ConsumeString(opts)")
+		g.P("if n >= 0 {")
+		g.P("return value")
+		g.P("}")
+		g.P("}")
+		g.P("n = protowire.ConsumeFieldValue(num, typ, opts)")
+		g.P("if n < 0 {")
+		g.P("break")
+		g.P("}")
+		g.P("opts = opts[n:]")
 		g.P("}")
 		g.P("return strconv.Itoa(int(x))")
 		g.P("}")

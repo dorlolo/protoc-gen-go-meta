@@ -1,3 +1,6 @@
 .vscode
 .idea
 protoc-gen-go-meta.exe
+.example2
+CLAUDE.md
+.claude
