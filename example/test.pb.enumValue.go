@@ -1,19 +1,18 @@
 package example
 
 import (
-	"github.com/dorlolo/protoc-gen-go-meta/meta"
-	"github.com/golang/protobuf/proto"
-	"strconv"
+	strconv "strconv"
+
+	meta "github.com/dorlolo/protoc-gen-go-meta/meta"
+	proto "google.golang.org/protobuf/proto"
 )
 
 func (x TestDataType) Value() string {
-	extOpts, err := proto.GetExtension(proto.MessageV1(x.Descriptor().Values().ByNumber(x.Number()).Options()), meta.E_EnumValue)
-	if err != nil {
-		return strconv.Itoa(int(x))
-	}
-	enumOptions, ok := extOpts.(*string)
-	if ok {
-		return *enumOptions
+	opts := x.Descriptor().Values().ByNumber(x.Number()).Options()
+	if val := proto.GetExtension(opts, meta.E_EnumValue); val != nil {
+		if str, ok := val.(string); ok {
+			return str
+		}
 	}
 	return strconv.Itoa(int(x))
 }

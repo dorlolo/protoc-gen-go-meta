@@ -44,12 +44,11 @@ func main() {
 		if ext == nil {
 			return nil
 		}
-		extNumber := ext.Desc.Number()
 		for _, f := range gen.Files {
 			if !f.Generate {
 				continue
 			}
-			GenerateFile(gen, f, extNumber)
+			GenerateFile(gen, f, ext)
 		}
 		gen.SupportedFeatures = gengo.SupportedFeatures
 		return nil
@@ -105,7 +104,8 @@ func hasEnumValueOption(file *protogen.File, number protoreflect.FieldNumber) bo
 	return false
 }
 
-func GenerateFile(gen *protogen.Plugin, file *protogen.File, enumValueNumber protoreflect.FieldNumber) *protogen.GeneratedFile {
+func GenerateFile(gen *protogen.Plugin, file *protogen.File, ext *protogen.Extension) *protogen.GeneratedFile {
+	enumValueNumber := ext.Desc.Number()
 	if !hasEnumValueOption(file, enumValueNumber) {
 		return nil
 	}
@@ -113,36 +113,30 @@ func GenerateFile(gen *protogen.Plugin, file *protogen.File, enumValueNumber pro
 	g := gen.NewGeneratedFile(filename, file.GoImportPath)
 	g.P("package ", file.GoPackageName)
 	g.P()
-	g.P("import (")
-	g.P("\"google.golang.org/protobuf/encoding/protowire\"")
-	g.P("\"strconv\"")
-	g.P(")")
+
+	// Build the correct extension variable identifier with E_ prefix
+	extIdent := protogen.GoIdent{
+		GoImportPath: ext.GoIdent.GoImportPath,
+		GoName:       "E_" + ext.GoIdent.GoName,
+	}
+
+	// Pre-declare that we need these imports (protogen will auto-add them when we use GoIdent)
+	// But we also need strconv and proto, which we'll reference by string
+	strconvIdent := protogen.GoIdent{GoImportPath: "strconv", GoName: "Itoa"}
+	protoIdent := protogen.GoIdent{GoImportPath: "google.golang.org/protobuf/proto", GoName: "GetExtension"}
 
 	for _, e := range file.Enums {
 		if !enumHasEnumValueOption(e, enumValueNumber) {
 			continue
 		}
 		g.P("func (x ", e.GoIdent, ") Value() string {")
-		g.P("opts := x.Descriptor().Values().ByNumber(x.Number()).Options().ProtoReflect().GetUnknown()")
-		g.P("for len(opts) > 0 {")
-		g.P("num, typ, n := protowire.ConsumeTag(opts)")
-		g.P("if n < 0 {")
-		g.P("break")
-		g.P("}")
-		g.P("opts = opts[n:]")
-		g.P("if num == ", protowire.Number(enumValueNumber), " && typ == protowire.BytesType {")
-		g.P("value, n := protowire.ConsumeString(opts)")
-		g.P("if n >= 0 {")
-		g.P("return value")
+		g.P("opts := x.Descriptor().Values().ByNumber(x.Number()).Options()")
+		g.P("if val := ", protoIdent, "(opts, ", extIdent, "); val != nil {")
+		g.P("if str, ok := val.(string); ok {")
+		g.P("return str")
 		g.P("}")
 		g.P("}")
-		g.P("n = protowire.ConsumeFieldValue(num, typ, opts)")
-		g.P("if n < 0 {")
-		g.P("break")
-		g.P("}")
-		g.P("opts = opts[n:]")
-		g.P("}")
-		g.P("return strconv.Itoa(int(x))")
+		g.P("return ", strconvIdent, "(int(x))")
 		g.P("}")
 		g.P()
 	}
