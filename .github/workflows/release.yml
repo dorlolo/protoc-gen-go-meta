@@ -18,10 +18,12 @@ jobs:
 
       - name: Package source code
         run: |
-          tar -czf protoc-gen-go-meta-source-${{ steps.get_version.outputs.VERSION }}.tar.gz --exclude='.git' --exclude='.github' .
+          mkdir -p dist
+          tar -czf dist/protoc-gen-go-meta-source-${{ steps.get_version.outputs.VERSION }}.tar.gz \
+            --exclude='.git' --exclude='.github' --exclude='dist' .
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: protoc-gen-go-meta-source-${{ steps.get_version.outputs.VERSION }}.tar.gz
+          files: dist/protoc-gen-go-meta-source-${{ steps.get_version.outputs.VERSION }}.tar.gz
           generate_release_notes: true
